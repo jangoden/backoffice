@@ -4,29 +4,31 @@ namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage; // <-- Import Storage facade
 
 class TemplateApiResource extends JsonResource
 {
     /**
      * Transform the resource into an array.
-     *
-     * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         return [
             'id' => $this->id,
             'title' => $this->title,
-            'category' => $this->category,
-            // Mengubah path gambar menjadi URL lengkap
-            'imageUrl' => Storage::url($this->imageUrl),
+            'slug' => $this->slug,
+            'demo_url' => $this->demo_url,
+            // PERUBAHAN PENTING: Menggunakan nama kolom yang benar & helper asset()
+            'image_url' => $this->image_preview ? asset('files/' . $this->image_preview) : null, 
             'description' => $this->description,
-            'demoUrl' => $this->demoUrl,
-            // 'tags' akan otomatis di-handle oleh Model
             'tags' => $this->tags,
-            'created_at' => $this->created_at,
-            'updated_at' => $this->updated_at,
+            // PERUBAHAN PENTING: Menyertakan data kategori dari relasi
+            'category' => $this->whenLoaded('templateCategory', function () {
+                return [
+                    'id' => $this->templateCategory->id,
+                    'name' => $this->templateCategory->name,
+                    'slug' => $this->templateCategory->slug,
+                ];
+            }),
         ];
     }
 }

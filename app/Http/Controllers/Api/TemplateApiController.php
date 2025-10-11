@@ -3,23 +3,40 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
+use App\Http\Resources\TemplateApiResource;
 use App\Models\Template;
-use App\Http\Resources\TemplateApiResource; // <-- Import Resource Anda
+use Illuminate\Http\Request;
 
 class TemplateApiController extends Controller
 {
     /**
      * Menampilkan daftar semua template.
      */
-    public function index()
+    public function index(Request $request)
     {
-        // Ambil semua data template
-        $templates = Template::all();
+        $templates = Template::query()
+            // PERUBAHAN PENTING: Memuat relasi 'templateCategory' secara efisien
+            ->with('templateCategory')
+            
+            // Filter berdasarkan slug kategori jika ada di request
+            ->when($request->category, function ($query, $categorySlug) {
+                $query->whereHas('templateCategory', function ($q) use ($categorySlug) {
+                    $q->where('slug', $categorySlug);
+                });
+            })
+            ->latest() // Urutkan dari yang terbaru
+            ->paginate(12); // Paginasi data
 
-        // Gunakan Resource untuk memformat collection data
         return TemplateApiResource::collection($templates);
     }
-
-    // Anda bisa menambahkan method lain (store, show, update, destroy) di sini nanti
+    
+    /**
+     * Menampilkan satu template spesifik.
+     */
+    public function show(Template $template)
+    {
+        // Memuat relasi agar data kategori juga muncul di halaman detail
+        $template->load('templateCategory');
+        return new TemplateApiResource($template);
+    }
 }

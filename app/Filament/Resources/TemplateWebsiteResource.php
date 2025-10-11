@@ -3,22 +3,25 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TemplateWebsiteResource\Pages;
-use App\Filament\Resources\TemplateWebsiteResource\RelationManagers;
 use App\Models\Template;
-use App\Models\TemplateWebsite;
+use App\Models\TemplateCategory; // <-- Tambahkan ini
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Support\Str; // <-- Tambahkan ini
 
 class TemplateWebsiteResource extends Resource
 {
     protected static ?string $model = Template::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-photo'; // Ganti ikon jika perlu
+    protected static ?string $navigationIcon = 'heroicon-o-photo';
+    
+    // Bonus: Mengelompokkan menu di sidebar
+    protected static ?string $navigationGroup = 'Template Management'; 
+    protected static ?string $modelLabel = 'Website Template';
+
 
     public static function form(Form $form): Form
     {
@@ -26,24 +29,52 @@ class TemplateWebsiteResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('title')
                     ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('category')
+                    ->maxLength(255)
+                    ->live(onBlur: true)
+                    ->afterStateUpdated(fn (Forms\Set $set, ?string $state) => $set('slug', Str::slug($state))),
+
+                // Slug akan dibuat otomatis dan read-only
+                Forms\Components\TextInput::make('slug')
                     ->required()
-                    ->maxLength(255),
-                Forms\Components\TextInput::make('demoUrl')
+                    ->maxLength(255)
+                    ->readOnly()
+                    ->unique(Template::class, 'slug', ignoreRecord: true),
+                
+                // INI BAGIAN UTAMA YANG DIUBAH
+                Forms\Components\Select::make('template_category_id')
+                    ->label('Category')
+                    ->relationship('templateCategory', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->required()
+                    ->createOptionForm([
+                        Forms\Components\TextInput::make('name')
+                            ->required()
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (Forms\Set $set, ?string $state) => $set('slug', Str::slug($state))),
+                        Forms\Components\TextInput::make('slug')
+                            ->required()
+                            ->readOnly()
+                            ->unique(TemplateCategory::class, 'slug'),
+                    ]),
+
+                Forms\Components\TextInput::make('demo_url') // Disesuaikan dengan nama kolom di migration
                     ->label('Demo URL')
                     ->required()
                     ->url()
                     ->maxLength(255),
-                Forms\Components\FileUpload::make('imageUrl')
+
+                Forms\Components\FileUpload::make('image_preview') // Disesuaikan dengan nama kolom di migration
                     ->label('Image Preview')
                     ->image()
-                    ->disk('public') // Pastikan storage Anda di-link (php artisan storage:link)
+                    ->disk('public')
                     ->directory('templates')
                     ->required(),
+
                 Forms\Components\Textarea::make('description')
                     ->required()
                     ->columnSpanFull(),
+
                 Forms\Components\TagsInput::make('tags')
                     ->required(),
             ]);
@@ -53,13 +84,18 @@ class TemplateWebsiteResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\ImageColumn::make('imageUrl')
+                Tables\Columns\ImageColumn::make('image_preview') // Disesuaikan
                     ->label('Image'),
                 Tables\Columns\TextColumn::make('title')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('category')
-                    ->searchable(),
+                
+                // Menampilkan nama kategori dari relasi
+                Tables\Columns\TextColumn::make('templateCategory.name')
+                    ->label('Category')
+                    ->searchable()
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable()
